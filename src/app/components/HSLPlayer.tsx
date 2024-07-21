@@ -17,8 +17,11 @@ interface HLSPlayerProps {
   clientId: string;
 }
 
+const videoSourceAPI = "http://localhost:3000/segment";
+
 class CustomLoader implements Loader<FragmentLoaderContext> {
   private clientId: string;
+  private isLastSegment: boolean = false;
   public context!: FragmentLoaderContext;
   public stats: LoaderStats;
 
@@ -52,7 +55,18 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
 
     // For segments, use our custom API
     if (url.endsWith(".ts")) {
-      fetch(`/api/segment?client_id=${this.clientId}`)
+      if (this.isLastSegment) {
+        // If we've already received the last segment, don't make a new request
+        callbacks.onSuccess(
+          { data: new Uint8Array(0), url: context.url },
+          this.stats,
+          context,
+          null
+        );
+        return;
+      }
+
+      fetch(`${videoSourceAPI}?client_id=${this.clientId}`)
         .then((response) => {
           if (!response.ok) {
             throw new Error("Segment not available");
@@ -66,6 +80,14 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
             data: new Uint8Array(data),
             url: context.url,
           };
+
+          // Check if this is the last segment
+          // You'll need to implement a way to determine if this is the last segment
+          // This could be done by checking the segment duration, or a flag from the server
+          if (this.isLastSegment) {
+            this.isLastSegment = true;
+          }
+
           callbacks.onSuccess(response, this.stats, context, null);
         })
         .catch((error) => {
@@ -130,7 +152,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ clientId }) => {
 
       hls.attachMedia(videoRef.current);
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        hls.loadSource("/api/hls/playlist.m3u8");
+        hls.loadSource(`${videoSourceAPI}/playlist.m3u8?client_id=${clientId}`);
       });
 
       hls.on(Hls.Events.ERROR, (event: string, data: ErrorData) => {
@@ -158,7 +180,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ clientId }) => {
       videoRef.current &&
       videoRef.current.canPlayType("application/vnd.apple.mpegurl")
     ) {
-      videoRef.current.src = "/api/hls/playlist.m3u8";
+      videoRef.current.src = `${videoSourceAPI}/playlist.m3u8?client_id=${clientId}`;
     } else {
       setError("HLS is not supported in this browser.");
     }
