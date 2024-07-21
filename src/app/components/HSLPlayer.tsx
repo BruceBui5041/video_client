@@ -18,15 +18,23 @@ interface HLSPlayerProps {
 }
 
 const videoSourceAPI = "http://localhost:3000/segment";
+const SEGMENT_DURATION = 10; // Assuming each segment is 10 seconds long
+const PRELOAD_THRESHOLD = 5; // Preload when within 5 seconds of the end of loaded content
 
 class CustomLoader implements Loader<FragmentLoaderContext> {
   private clientId: string;
   private isLastSegment: boolean = false;
+  private videoElement: HTMLVideoElement | null = null;
   public context!: FragmentLoaderContext;
   public stats: LoaderStats;
 
-  constructor(config: LoaderConfiguration, clientId: string) {
+  constructor(
+    config: LoaderConfiguration,
+    clientId: string,
+    videoElement: HTMLVideoElement
+  ) {
     this.clientId = clientId;
+    this.videoElement = videoElement;
     this.stats = {
       aborted: false,
       loaded: 0,
@@ -53,10 +61,9 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
 
     this.stats.loading.start = self.performance.now();
 
-    // For segments, use our custom API
+    // For segments, use our custom API with delay
     if (url.endsWith(".ts")) {
       if (this.isLastSegment) {
-        // If we've already received the last segment, don't make a new request
         callbacks.onSuccess(
           { data: new Uint8Array(0), url: context.url },
           this.stats,
@@ -66,39 +73,58 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
         return;
       }
 
-      fetch(`${videoSourceAPI}?client_id=${this.clientId}`)
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error("Segment not available");
-          }
-          return response.arrayBuffer();
-        })
-        .then((data) => {
-          this.stats.loaded = data.byteLength;
-          this.stats.loading.end = self.performance.now();
-          const response: LoaderResponse = {
-            data: new Uint8Array(data),
-            url: context.url,
-          };
+      const delayAndFetch = () => {
+        fetch(`${videoSourceAPI}?client_id=${this.clientId}`)
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error("Segment not available");
+            }
+            return response.arrayBuffer();
+          })
+          .then((data) => {
+            this.stats.loaded = data.byteLength;
+            this.stats.loading.end = self.performance.now();
+            const response: LoaderResponse = {
+              data: new Uint8Array(data),
+              url: context.url,
+            };
 
-          // Check if this is the last segment
-          // You'll need to implement a way to determine if this is the last segment
-          // This could be done by checking the segment duration, or a flag from the server
-          if (this.isLastSegment) {
-            this.isLastSegment = true;
-          }
+            // Check if this is the last segment (implement your own logic here)
+            // if (isLastSegment) {
+            //   this.isLastSegment = true;
+            // }
 
-          callbacks.onSuccess(response, this.stats, context, null);
-        })
-        .catch((error) => {
-          this.stats.loading.end = self.performance.now();
-          callbacks.onError(
-            { code: 0, text: error.message },
-            context,
-            null,
-            this.stats
-          );
-        });
+            callbacks.onSuccess(response, this.stats, context, null);
+          })
+          .catch((error) => {
+            this.stats.loading.end = self.performance.now();
+            callbacks.onError(
+              { code: 0, text: error.message },
+              context,
+              null,
+              this.stats
+            );
+          });
+      };
+
+      if (this.videoElement) {
+        const currentTime = this.videoElement.currentTime;
+        const bufferedEnd =
+          this.videoElement.buffered.length > 0
+            ? this.videoElement.buffered.end(
+                this.videoElement.buffered.length - 1
+              )
+            : 0;
+
+        if (bufferedEnd - currentTime < PRELOAD_THRESHOLD) {
+          delayAndFetch();
+        } else {
+          const delay = (bufferedEnd - currentTime - PRELOAD_THRESHOLD) * 1000;
+          setTimeout(delayAndFetch, delay);
+        }
+      } else {
+        delayAndFetch(); // Fallback if video element is not available
+      }
     } else {
       // For other requests (like playlist), use default XHR
       const xhr = new XMLHttpRequest();
@@ -127,11 +153,12 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
   }
 
   static createLoader(
-    clientId: string
+    clientId: string,
+    videoElement: HTMLVideoElement
   ): new (config: LoaderConfiguration) => Loader<FragmentLoaderContext> {
     return class extends CustomLoader {
       constructor(config: LoaderConfiguration) {
-        super(config, clientId);
+        super(config, clientId, videoElement);
       }
     };
   }
@@ -146,7 +173,9 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ clientId }) => {
     if (Hls.isSupported() && videoRef.current) {
       const hls = new Hls({
         debug: true,
-        fLoader: CustomLoader.createLoader(clientId) as any,
+        fLoader: CustomLoader.createLoader(clientId, videoRef.current) as any,
+        maxBufferSize: 30 * 1000 * 1000, // 30 MB
+        maxBufferLength: 5, // 5 seconds
       });
       hlsRef.current = hls;
 
