@@ -82,7 +82,7 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
 
         // Construct the API request URL
         const apiUrl = new URL(videoSourceAPI);
-        apiUrl.searchParams.append("client_id", this.clientId);
+        // apiUrl.searchParams.append("client_id", this.clientId);
         Object.entries(segmentInfo).forEach(([key, value]) => {
           apiUrl.searchParams.append(key, value);
         });
