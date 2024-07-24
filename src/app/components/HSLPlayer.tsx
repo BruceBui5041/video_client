@@ -17,9 +17,10 @@ import {
 
 interface HLSPlayerProps {
   videoName: string;
+  resolution: string;
 }
 
-const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
+const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName, resolution }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -42,7 +43,11 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
     if (Hls.isSupported() && videoRef.current) {
       const hls = new Hls({
         debug: true,
-        fLoader: CustomLoader.createLoader(videoName, videoRef.current) as any,
+        fLoader: CustomLoader.createLoader(
+          videoName,
+          resolution,
+          videoRef.current
+        ) as any,
         maxBufferSize: 30 * 1000 * 1000, // 30 MB
         maxBufferLength: 5, // 5 seconds
       });
@@ -50,9 +55,8 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
 
       hls.attachMedia(videoRef.current);
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        hls.loadSource(
-          `${SEGMENT_API}/playlist?name=test.mp4&resolution=1080p`
-        );
+        const playlistUrl = `${SEGMENT_API}/playlist?name=${videoName}&resolution=${resolution}`;
+        hls.loadSource(playlistUrl);
       });
 
       hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
@@ -89,11 +93,11 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
       videoRef.current &&
       videoRef.current.canPlayType("application/vnd.apple.mpegurl")
     ) {
-      videoRef.current.src = `${SEGMENT_API}/playlist?name=test.mp4&resolution=1080p`;
+      videoRef.current.src = `${SEGMENT_API}/playlist?name=${videoName}&resolution=${resolution}`;
     } else {
       setError("HLS is not supported in this browser.");
     }
-  }, [videoName]);
+  }, [videoName, resolution]);
 
   useEffect(() => {
     const videoElement = videoRef.current;

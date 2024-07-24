@@ -16,6 +16,7 @@ const PRELOAD_THRESHOLD = 15; // Preload when within 5 seconds of the end of loa
 
 class CustomLoader implements Loader<FragmentLoaderContext> {
   private videoName: string;
+  private resolution: string;
   private isLastSegment: boolean = false;
   private videoElement: HTMLVideoElement | null = null;
   public context!: FragmentLoaderContext;
@@ -24,9 +25,11 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
   constructor(
     config: LoaderConfiguration,
     videoName: string,
+    resolution: string,
     videoElement: HTMLVideoElement
   ) {
     this.videoName = videoName;
+    this.resolution = resolution;
     this.videoElement = videoElement;
     this.stats = {
       aborted: false,
@@ -84,7 +87,7 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
         const apiUrl = new URL(videoSourceAPI);
 
         apiUrl.searchParams.append("name", this.videoName);
-        apiUrl.searchParams.append("resolution", "1080p");
+        apiUrl.searchParams.append("resolution", this.resolution);
 
         Object.entries(segmentInfo).forEach(([key, value]) => {
           apiUrl.searchParams.append(key, value);
@@ -117,7 +120,6 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
             );
           });
       };
-
       if (this.videoElement) {
         const currentTime = this.videoElement.currentTime;
         const bufferedEnd =
@@ -186,11 +188,12 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
 
   static createLoader(
     videoName: string,
+    resolution: string,
     videoElement: HTMLVideoElement
   ): new (config: LoaderConfiguration) => Loader<FragmentLoaderContext> {
     return class extends CustomLoader {
       constructor(config: LoaderConfiguration) {
-        super(config, videoName, videoElement);
+        super(config, videoName, resolution, videoElement);
       }
     };
   }
