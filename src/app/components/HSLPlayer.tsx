@@ -16,10 +16,10 @@ import {
 } from "lucide-react";
 
 interface HLSPlayerProps {
-  clientId: string;
+  videoName: string;
 }
 
-const HLSPlayer: React.FC<HLSPlayerProps> = ({ clientId }) => {
+const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -42,7 +42,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ clientId }) => {
     if (Hls.isSupported() && videoRef.current) {
       const hls = new Hls({
         debug: true,
-        fLoader: CustomLoader.createLoader(clientId, videoRef.current) as any,
+        fLoader: CustomLoader.createLoader(videoName, videoRef.current) as any,
         maxBufferSize: 30 * 1000 * 1000, // 30 MB
         maxBufferLength: 5, // 5 seconds
       });
@@ -50,7 +50,9 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ clientId }) => {
 
       hls.attachMedia(videoRef.current);
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        hls.loadSource(`${SEGMENT_API}/playlist.m3u8`);
+        hls.loadSource(
+          `${SEGMENT_API}/playlist?name=test.mp4&resolution=1080p`
+        );
       });
 
       hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
@@ -66,7 +68,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ clientId }) => {
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR:
-              hls.startLoad();
+              // hls.startLoad();
               break;
             case Hls.ErrorTypes.MEDIA_ERROR:
               hls.recoverMediaError();
@@ -87,11 +89,11 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ clientId }) => {
       videoRef.current &&
       videoRef.current.canPlayType("application/vnd.apple.mpegurl")
     ) {
-      videoRef.current.src = `${SEGMENT_API}/playlist.m3u8`;
+      videoRef.current.src = `${SEGMENT_API}/playlist?name=test.mp4&resolution=1080p`;
     } else {
       setError("HLS is not supported in this browser.");
     }
-  }, [clientId]);
+  }, [videoName]);
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -139,7 +141,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ clientId }) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          clientId,
+          clientId: videoName,
           resolution: hlsRef.current.levels[level].height,
         }),
       }).catch((error) =>

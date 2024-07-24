@@ -12,10 +12,10 @@ import {
 
 const videoSourceAPI = "http://localhost:3000/segment";
 const SEGMENT_DURATION = 10; // Assuming each segment is 10 seconds long
-const PRELOAD_THRESHOLD = 5; // Preload when within 5 seconds of the end of loaded content
+const PRELOAD_THRESHOLD = 15; // Preload when within 5 seconds of the end of loaded content
 
 class CustomLoader implements Loader<FragmentLoaderContext> {
-  private clientId: string;
+  private videoName: string;
   private isLastSegment: boolean = false;
   private videoElement: HTMLVideoElement | null = null;
   public context!: FragmentLoaderContext;
@@ -23,10 +23,10 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
 
   constructor(
     config: LoaderConfiguration,
-    clientId: string,
+    videoName: string,
     videoElement: HTMLVideoElement
   ) {
-    this.clientId = clientId;
+    this.videoName = videoName;
     this.videoElement = videoElement;
     this.stats = {
       aborted: false,
@@ -82,7 +82,10 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
 
         // Construct the API request URL
         const apiUrl = new URL(videoSourceAPI);
-        // apiUrl.searchParams.append("client_id", this.clientId);
+
+        apiUrl.searchParams.append("name", this.videoName);
+        apiUrl.searchParams.append("resolution", "1080p");
+
         Object.entries(segmentInfo).forEach(([key, value]) => {
           apiUrl.searchParams.append(key, value);
         });
@@ -182,12 +185,12 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
   }
 
   static createLoader(
-    clientId: string,
+    videoName: string,
     videoElement: HTMLVideoElement
   ): new (config: LoaderConfiguration) => Loader<FragmentLoaderContext> {
     return class extends CustomLoader {
       constructor(config: LoaderConfiguration) {
-        super(config, clientId, videoElement);
+        super(config, videoName, videoElement);
       }
     };
   }

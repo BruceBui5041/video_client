@@ -4,7 +4,7 @@ export default function VideoPage() {
   return (
     <div>
       <h1>HLS Video Player</h1>
-      <HLSPlayer clientId="client1" />
+      <HLSPlayer videoName="test.mp4" />
     </div>
   );
 }
