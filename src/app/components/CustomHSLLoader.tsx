@@ -12,11 +12,10 @@ import {
 
 const videoSourceAPI = "http://localhost:3000/segment";
 const SEGMENT_DURATION = 10; // Assuming each segment is 10 seconds long
-const PRELOAD_THRESHOLD = 15; // Preload when within 5 seconds of the end of loaded content
+const PRELOAD_THRESHOLD = 5; // Preload when within 5 seconds of the end of loaded content
 
 class CustomLoader implements Loader<FragmentLoaderContext> {
   private videoName: string;
-  private resolution: string;
   private isLastSegment: boolean = false;
   private videoElement: HTMLVideoElement | null = null;
   public context!: FragmentLoaderContext;
@@ -25,11 +24,9 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
   constructor(
     config: LoaderConfiguration,
     videoName: string,
-    resolution: string,
     videoElement: HTMLVideoElement
   ) {
     this.videoName = videoName;
-    this.resolution = resolution;
     this.videoElement = videoElement;
     this.stats = {
       aborted: false,
@@ -87,7 +84,7 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
         const apiUrl = new URL(videoSourceAPI);
 
         apiUrl.searchParams.append("name", this.videoName);
-        apiUrl.searchParams.append("resolution", this.resolution);
+        // apiUrl.searchParams.append("resolution", this.resolution);
 
         Object.entries(segmentInfo).forEach(([key, value]) => {
           apiUrl.searchParams.append(key, value);
@@ -168,32 +165,40 @@ class CustomLoader implements Loader<FragmentLoaderContext> {
   private extractSegmentInfo(url: string): Record<string, string> | null {
     const parsedUrl = new URL(url);
     const pathSegments = parsedUrl.pathname.split("/");
-    const filename = pathSegments[pathSegments.length - 1];
 
-    // Try to extract segment number
+    // Extract video name
+    const videoName = pathSegments[3];
+
+    // Extract resolution
+    const resolution = pathSegments[4];
+
+    // Extract segment information
+    const filename = pathSegments[pathSegments.length - 1];
     const segmentMatch = filename.match(/segment_(\d+)\.ts/);
     if (segmentMatch) {
-      return { segment: segmentMatch[0], number: segmentMatch[1] };
-    }
-
-    // Try to extract timestamp
-    const timestampMatch = filename.match(/(\d+)\.ts/);
-    if (timestampMatch) {
-      return { segment: timestampMatch[0], timestamp: timestampMatch[1] };
+      return {
+        videoName,
+        resolution,
+        segment: segmentMatch[0],
+        number: segmentMatch[1],
+      };
     }
 
     // If we can't extract info from the filename, use the whole pathname
-    return { path: parsedUrl.pathname };
+    return {
+      videoName,
+      resolution,
+      path: parsedUrl.pathname,
+    };
   }
 
   static createLoader(
     videoName: string,
-    resolution: string,
     videoElement: HTMLVideoElement
   ): new (config: LoaderConfiguration) => Loader<FragmentLoaderContext> {
     return class extends CustomLoader {
       constructor(config: LoaderConfiguration) {
-        super(config, videoName, resolution, videoElement);
+        super(config, videoName, videoElement);
       }
     };
   }

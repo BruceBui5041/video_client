@@ -17,10 +17,9 @@ import {
 
 interface HLSPlayerProps {
   videoName: string;
-  resolution: string;
 }
 
-const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName, resolution }) => {
+const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -38,34 +37,39 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName, resolution }) => {
   const [showSkipIndicator, setShowSkipIndicator] = useState<
     "backward" | "forward" | null
   >(null);
+  const [currentResolution, setCurrentResolution] = useState<string>("Auto");
 
   useEffect(() => {
     if (Hls.isSupported() && videoRef.current) {
       const hls = new Hls({
         debug: true,
-        fLoader: CustomLoader.createLoader(
-          videoName,
-          resolution,
-          videoRef.current
-        ) as any,
+        fLoader: CustomLoader.createLoader(videoName, videoRef.current) as any,
         maxBufferSize: 30 * 1000 * 1000, // 30 MB
-        maxBufferLength: 5, // 5 seconds
+        maxBufferLength: 15, // 5 seconds
+        startLevel: -1,
       });
       hlsRef.current = hls;
 
       hls.attachMedia(videoRef.current);
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        const playlistUrl = `${SEGMENT_API}/playlist?name=${videoName}&resolution=${resolution}`;
-        hls.loadSource(playlistUrl);
+        const masterPlaylistUrl = `${SEGMENT_API}/playlist/${videoName}`;
+        hls.loadSource(masterPlaylistUrl);
       });
 
       hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
         setLevels(hls.levels);
+        const savedLevel = getSavedResolution(videoName);
+        if (savedLevel !== null && savedLevel < hls.levels.length) {
+          hls.currentLevel = savedLevel;
+        }
         setCurrentLevel(hls.currentLevel);
+        updateCurrentResolution(hls.currentLevel);
       });
 
       hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
         setCurrentLevel(data.level);
+        updateCurrentResolution(data.level);
+        saveResolution(videoName, data.level);
       });
 
       hls.on(Hls.Events.ERROR, (event: string, data: ErrorData) => {
@@ -93,11 +97,20 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName, resolution }) => {
       videoRef.current &&
       videoRef.current.canPlayType("application/vnd.apple.mpegurl")
     ) {
-      videoRef.current.src = `${SEGMENT_API}/playlist?name=${videoName}&resolution=${resolution}`;
+      videoRef.current.src = `${SEGMENT_API}/playlist/${videoName}`;
     } else {
       setError("HLS is not supported in this browser.");
     }
-  }, [videoName, resolution]);
+  }, [videoName]);
+
+  const getSavedResolution = (videoName: string): number | null => {
+    const savedResolution = localStorage.getItem(`${videoName}_resolution`);
+    return savedResolution ? parseInt(savedResolution, 10) : null;
+  };
+
+  const saveResolution = (videoName: string, level: number) => {
+    localStorage.setItem(`${videoName}_resolution`, level.toString());
+  };
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -133,24 +146,20 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName, resolution }) => {
     };
   }, []);
 
+  const updateCurrentResolution = (level: number) => {
+    if (level === -1) {
+      setCurrentResolution("Auto");
+    } else if (hlsRef.current && hlsRef.current.levels[level]) {
+      setCurrentResolution(`${hlsRef.current.levels[level].height}p`);
+    }
+  };
+
   const handleResolutionChange = (level: number) => {
     if (hlsRef.current) {
       hlsRef.current.currentLevel = level;
       setCurrentLevel(level);
-      setShowQualityMenu(false);
-      // Send the selected resolution to the backend
-      fetch(`${SEGMENT_API}/set-resolution`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          clientId: videoName,
-          resolution: hlsRef.current.levels[level].height,
-        }),
-      }).catch((error) =>
-        console.error("Error sending resolution to backend:", error)
-      );
+      updateCurrentResolution(level);
+      saveResolution(videoName, level);
     }
   };
 
@@ -282,15 +291,18 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName, resolution }) => {
                 <div className="flex items-center space-x-4">
                   <div className="relative">
                     <button
-                      className="text-white"
+                      className="text-white flex items-center"
                       onClick={() => setShowQualityMenu(!showQualityMenu)}
                     >
-                      <Settings size={24} />
+                      <Settings size={24} className="mr-2" />
+                      <span className="text-sm">{currentResolution}</span>
                     </button>
                     {showQualityMenu && (
                       <div className="absolute bottom-full right-0 bg-black bg-opacity-75 rounded p-2 mb-2">
                         <button
-                          className="block text-white text-sm px-2 py-1 hover:bg-gray-700 w-full text-left"
+                          className={`block text-white text-sm px-2 py-1 hover:bg-gray-700 w-full text-left ${
+                            currentLevel === -1 ? "bg-gray-700" : ""
+                          }`}
                           onClick={() => handleResolutionChange(-1)}
                         >
                           Auto
@@ -298,7 +310,9 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName, resolution }) => {
                         {levels.map((level, index) => (
                           <button
                             key={index}
-                            className="block text-white text-sm px-2 py-1 hover:bg-gray-700 w-full text-left"
+                            className={`block text-white text-sm px-2 py-1 hover:bg-gray-700 w-full text-left ${
+                              currentLevel === index ? "bg-gray-700" : ""
+                            }`}
                             onClick={() => handleResolutionChange(index)}
                           >
                             {level.height}p
