@@ -1,12 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
-import Hls, {
-  ErrorData,
-  Level,
-  LoaderConfig,
-  LoaderConfiguration,
-} from "hls.js";
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import Hls, { Level, LoaderConfiguration } from "hls.js";
 import CustomLoader, { CustomLoaderInterface } from "./CustomHSLLoader";
 import { SEGMENT_API } from "@/constants";
 import {
@@ -114,14 +109,14 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
     }
   }, [videoName]);
 
-  const getSavedResolution = (videoName: string): number | null => {
+  const getSavedResolution = useCallback((videoName: string): number | null => {
     const savedResolution = localStorage.getItem(`${videoName}_resolution`);
     return savedResolution ? parseInt(savedResolution, 10) : null;
-  };
+  }, []);
 
-  const saveResolution = (videoName: string, level: number) => {
+  const saveResolution = useCallback((videoName: string, level: number) => {
     localStorage.setItem(`${videoName}_resolution`, level.toString());
-  };
+  }, []);
 
   useEffect(() => {
     const videoElement = videoRef.current;
@@ -157,7 +152,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
     };
   }, []);
 
-  const updateCurrentResolution = (level: number) => {
+  const updateCurrentResolution = useCallback((level: number) => {
     if (level === -1) {
       setCurrentResolution("Auto");
       if (customLoaderRef.current) {
@@ -170,15 +165,16 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
         customLoaderRef.current.setResolution(resolution);
       }
     }
-  };
+  }, []);
 
-  const handleResolutionChange = (level: number) => {
+  const handleResolutionChange = useCallback((level: number) => {
     if (hlsRef.current) {
       hlsRef.current.currentLevel = level;
     }
-  };
+    setShowQualityMenu(false);
+  }, []);
 
-  const togglePlay = () => {
+  const togglePlay = useCallback(() => {
     if (videoRef.current) {
       if (isPlaying) {
         videoRef.current.pause();
@@ -187,18 +183,21 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
       }
       setIsPlaying(!isPlaying);
     }
-  };
+  }, [isPlaying]);
 
-  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newVolume = parseFloat(e.target.value);
-    setVolume(newVolume);
-    if (videoRef.current) {
-      videoRef.current.volume = newVolume;
-    }
-    setIsMuted(newVolume === 0);
-  };
+  const handleVolumeChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const newVolume = parseFloat(e.target.value);
+      setVolume(newVolume);
+      if (videoRef.current) {
+        videoRef.current.volume = newVolume;
+      }
+      setIsMuted(newVolume === 0);
+    },
+    []
+  );
 
-  const toggleMute = () => {
+  const toggleMute = useCallback(() => {
     if (videoRef.current) {
       videoRef.current.muted = !isMuted;
       setIsMuted(!isMuted);
@@ -208,7 +207,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
         setVolume(0);
       }
     }
-  };
+  }, [isMuted]);
 
   const handleProgressChange = (e: React.MouseEvent<HTMLDivElement>) => {
     if (videoRef.current && progressRef.current) {
@@ -216,45 +215,33 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
       const pos = (e.clientX - rect.left) / rect.width;
       const newTime = pos * videoRef.current.duration;
       videoRef.current.currentTime = newTime;
-
-      // Force reload of the current segment
-      if (hlsRef.current) {
-        hlsRef.current.trigger(Hls.Events.BUFFER_FLUSHING);
-        hlsRef.current.trigger(Hls.Events.BUFFER_RESET);
-      }
     }
   };
 
-  const formatTime = (time: number) => {
+  const formatTime = useCallback((time: number) => {
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
     return `${minutes}:${seconds < 10 ? "0" : ""}${seconds}`;
-  };
+  }, []);
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       playerRef.current?.requestFullscreen();
     } else {
       document.exitFullscreen();
     }
-  };
+  }, []);
 
-  const skipBackward = () => {
+  const skipBackward = useCallback(() => {
     if (videoRef.current) {
       const newTime = Math.max(videoRef.current.currentTime - 5, 0);
       videoRef.current.currentTime = newTime;
       setShowSkipIndicator("backward");
       setTimeout(() => setShowSkipIndicator(null), 500);
-
-      // Force reload of the current segment
-      if (hlsRef.current) {
-        hlsRef.current.trigger(Hls.Events.BUFFER_FLUSHING);
-        hlsRef.current.trigger(Hls.Events.BUFFER_RESET);
-      }
     }
-  };
+  }, []);
 
-  const skipForward = () => {
+  const skipForward = useCallback(() => {
     if (videoRef.current) {
       const newTime = Math.min(
         videoRef.current.currentTime + 5,
@@ -263,21 +250,22 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
       videoRef.current.currentTime = newTime;
       setShowSkipIndicator("forward");
       setTimeout(() => setShowSkipIndicator(null), 500);
-
-      // Force reload of the current segment
-      if (hlsRef.current) {
-        hlsRef.current.trigger(Hls.Events.BUFFER_FLUSHING);
-        hlsRef.current.trigger(Hls.Events.BUFFER_RESET);
-      }
     }
-  };
+  }, []);
+
+  const handleMouseEnter = useCallback(() => setShowControls(true), []);
+  const handleMouseLeave = useCallback(() => setShowControls(false), []);
+  const toggleQualityMenu = useCallback(
+    () => setShowQualityMenu(!showQualityMenu),
+    [showQualityMenu]
+  );
 
   return (
     <div
       ref={playerRef}
       className="relative w-full max-w-4xl mx-auto bg-black"
-      onMouseEnter={() => setShowControls(true)}
-      onMouseLeave={() => setShowControls(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {error ? (
         <p className="text-white p-4">{error}</p>
@@ -331,7 +319,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
                   <div className="relative">
                     <button
                       className="text-white flex items-center"
-                      onClick={() => setShowQualityMenu(!showQualityMenu)}
+                      onClick={toggleQualityMenu}
                     >
                       <Settings size={24} className="mr-2" />
                       <span className="text-sm">{currentResolution}</span>
