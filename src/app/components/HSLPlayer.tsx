@@ -1,8 +1,13 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import Hls, { ErrorData, Level } from "hls.js";
-import CustomLoader from "./CustomHSLLoader";
+import Hls, {
+  ErrorData,
+  Level,
+  LoaderConfig,
+  LoaderConfiguration,
+} from "hls.js";
+import CustomLoader, { CustomLoaderInterface } from "./CustomHSLLoader";
 import { SEGMENT_API } from "@/constants";
 import {
   Play,
@@ -39,15 +44,41 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
   >(null);
   const [currentResolution, setCurrentResolution] = useState<string>("Auto");
 
+  const customLoaderRef = useRef<CustomLoaderInterface | null>(null);
+
   useEffect(() => {
     if (Hls.isSupported() && videoRef.current) {
+      const loaderConfig: LoaderConfiguration = {
+        loadPolicy: {
+          maxTimeToFirstByteMs: 8000,
+          maxLoadTimeMs: 20000,
+          timeoutRetry: null,
+          errorRetry: null,
+        },
+        maxRetry: 3,
+        timeout: 30000,
+        retryDelay: 1000,
+        maxRetryDelay: 8000,
+      };
+
+      const customLoader = CustomLoader.createLoader(
+        videoName,
+        videoRef.current
+      );
+      const customLoaderInstance = new customLoader(
+        loaderConfig
+      ) as CustomLoaderInterface;
+      customLoaderRef.current = customLoaderInstance;
+
       const hls = new Hls({
         debug: true,
-        fLoader: CustomLoader.createLoader(videoName, videoRef.current) as any,
-        maxBufferSize: 30 * 1000 * 1000, // 30 MB
-        maxBufferLength: 15, // 5 seconds
+        fLoader: customLoader as any,
+        maxBufferSize: 5 * 1000 * 1000, // 5 MB
+        maxBufferLength: 15, // 2 seconds
         startLevel: -1,
+        maxMaxBufferLength: 5, // Maximum buffer size in seconds
       });
+
       hlsRef.current = hls;
 
       hls.attachMedia(videoRef.current);
@@ -58,6 +89,11 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
 
       hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
         setLevels(hls.levels);
+        const availableResolutions = hls.levels.map(
+          (level) => `${level.height}p`
+        );
+        customLoaderInstance.setAvailableResolutions(availableResolutions);
+
         const savedLevel = getSavedResolution(videoName);
         if (savedLevel !== null && savedLevel < hls.levels.length) {
           hls.currentLevel = savedLevel;
@@ -72,34 +108,9 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
         saveResolution(videoName, data.level);
       });
 
-      hls.on(Hls.Events.ERROR, (event: string, data: ErrorData) => {
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              // hls.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              hls.recoverMediaError();
-              break;
-            default:
-              setError("An error occurred while loading the video.");
-              break;
-          }
-        }
-      });
-
       return () => {
-        if (hls) {
-          hls.destroy();
-        }
+        hls.destroy();
       };
-    } else if (
-      videoRef.current &&
-      videoRef.current.canPlayType("application/vnd.apple.mpegurl")
-    ) {
-      videoRef.current.src = `${SEGMENT_API}/playlist/${videoName}`;
-    } else {
-      setError("HLS is not supported in this browser.");
     }
   }, [videoName]);
 
@@ -149,17 +160,21 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
   const updateCurrentResolution = (level: number) => {
     if (level === -1) {
       setCurrentResolution("Auto");
+      if (customLoaderRef.current) {
+        customLoaderRef.current.setResolution("Auto");
+      }
     } else if (hlsRef.current && hlsRef.current.levels[level]) {
-      setCurrentResolution(`${hlsRef.current.levels[level].height}p`);
+      const resolution = `${hlsRef.current.levels[level].height}p`;
+      setCurrentResolution(resolution);
+      if (customLoaderRef.current) {
+        customLoaderRef.current.setResolution(resolution);
+      }
     }
   };
 
   const handleResolutionChange = (level: number) => {
     if (hlsRef.current) {
       hlsRef.current.currentLevel = level;
-      setCurrentLevel(level);
-      updateCurrentResolution(level);
-      saveResolution(videoName, level);
     }
   };
 
@@ -199,7 +214,14 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
     if (videoRef.current && progressRef.current) {
       const rect = progressRef.current.getBoundingClientRect();
       const pos = (e.clientX - rect.left) / rect.width;
-      videoRef.current.currentTime = pos * videoRef.current.duration;
+      const newTime = pos * videoRef.current.duration;
+      videoRef.current.currentTime = newTime;
+
+      // Force reload of the current segment
+      if (hlsRef.current) {
+        hlsRef.current.trigger(Hls.Events.BUFFER_FLUSHING);
+        hlsRef.current.trigger(Hls.Events.BUFFER_RESET);
+      }
     }
   };
 
@@ -219,17 +241,34 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
 
   const skipBackward = () => {
     if (videoRef.current) {
-      videoRef.current.currentTime -= 5;
+      const newTime = Math.max(videoRef.current.currentTime - 5, 0);
+      videoRef.current.currentTime = newTime;
       setShowSkipIndicator("backward");
       setTimeout(() => setShowSkipIndicator(null), 500);
+
+      // Force reload of the current segment
+      if (hlsRef.current) {
+        hlsRef.current.trigger(Hls.Events.BUFFER_FLUSHING);
+        hlsRef.current.trigger(Hls.Events.BUFFER_RESET);
+      }
     }
   };
 
   const skipForward = () => {
     if (videoRef.current) {
-      videoRef.current.currentTime += 5;
+      const newTime = Math.min(
+        videoRef.current.currentTime + 5,
+        videoRef.current.duration
+      );
+      videoRef.current.currentTime = newTime;
       setShowSkipIndicator("forward");
       setTimeout(() => setShowSkipIndicator(null), 500);
+
+      // Force reload of the current segment
+      if (hlsRef.current) {
+        hlsRef.current.trigger(Hls.Events.BUFFER_FLUSHING);
+        hlsRef.current.trigger(Hls.Events.BUFFER_RESET);
+      }
     }
   };
 
