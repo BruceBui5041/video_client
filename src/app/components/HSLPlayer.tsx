@@ -38,6 +38,8 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
     "backward" | "forward" | null
   >(null);
   const [currentResolution, setCurrentResolution] = useState<string>("Auto");
+  const [buffered, setBuffered] = useState<TimeRanges | null>(null);
+  const [isProgressHovered, setIsProgressHovered] = useState(false);
 
   const customLoaderRef = useRef<CustomLoaderInterface | null>(null);
 
@@ -137,6 +139,79 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
   }, []);
 
   useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+
+    const updateBuffered = () => {
+      setBuffered(videoElement.buffered);
+    };
+
+    videoElement.addEventListener("progress", updateBuffered);
+
+    return () => {
+      videoElement.removeEventListener("progress", updateBuffered);
+    };
+  }, []);
+
+  const renderBufferedRanges = useCallback(() => {
+    if (!buffered || !videoRef.current) return null;
+
+    const ranges = [];
+    for (let i = 0; i < buffered.length; i++) {
+      const start = buffered.start(i);
+      const end = buffered.end(i);
+      const width = ((end - start) / videoRef.current.duration) * 100;
+      const left = (start / videoRef.current.duration) * 100;
+      ranges.push(
+        <div
+          key={i}
+          className="absolute h-full bg-gray-400 opacity-50"
+          style={{ left: `${left}%`, width: `${width}%` }}
+        />
+      );
+    }
+    return ranges;
+  }, [buffered]);
+
+  const togglePlay = useCallback(() => {
+    if (videoRef.current) {
+      if (isPlaying) {
+        videoRef.current.pause();
+      } else {
+        videoRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  }, [isPlaying]);
+
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+
+    const updateTime = () => {
+      setCurrentTime(videoElement.currentTime);
+      setDuration(videoElement.duration);
+    };
+
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        togglePlay();
+      }
+    };
+
+    videoElement.addEventListener("timeupdate", updateTime);
+    videoElement.addEventListener("loadedmetadata", updateTime);
+    document.addEventListener("keydown", handleKeyPress);
+
+    return () => {
+      videoElement.removeEventListener("timeupdate", updateTime);
+      videoElement.removeEventListener("loadedmetadata", updateTime);
+      document.removeEventListener("keydown", handleKeyPress);
+    };
+  }, [togglePlay]);
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") {
         skipBackward();
@@ -150,6 +225,10 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
+  }, []);
+
+  const handleProgressHover = useCallback((isHovered: boolean) => {
+    setIsProgressHovered(isHovered);
   }, []);
 
   const updateCurrentResolution = useCallback((level: number) => {
@@ -173,17 +252,6 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
     }
     setShowQualityMenu(false);
   }, []);
-
-  const togglePlay = useCallback(() => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsPlaying(!isPlaying);
-    }
-  }, [isPlaying]);
 
   const handleVolumeChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -209,14 +277,17 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
     }
   }, [isMuted]);
 
-  const handleProgressChange = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (videoRef.current && progressRef.current) {
-      const rect = progressRef.current.getBoundingClientRect();
-      const pos = (e.clientX - rect.left) / rect.width;
-      const newTime = pos * videoRef.current.duration;
-      videoRef.current.currentTime = newTime;
-    }
-  };
+  const handleProgressChange = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (videoRef.current && progressRef.current) {
+        const rect = progressRef.current.getBoundingClientRect();
+        const pos = (e.clientX - rect.left) / rect.width;
+        const newTime = pos * videoRef.current.duration;
+        videoRef.current.currentTime = newTime;
+      }
+    },
+    []
+  );
 
   const formatTime = useCallback((time: number) => {
     const minutes = Math.floor(time / 60);
@@ -255,6 +326,16 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
 
   const handleMouseEnter = useCallback(() => setShowControls(true), []);
   const handleMouseLeave = useCallback(() => setShowControls(false), []);
+
+  const handleProgressMouseEnter = useCallback(
+    () => handleProgressHover(true),
+    [handleProgressHover]
+  );
+  const handleProgressMouseLeave = useCallback(
+    () => handleProgressHover(false),
+    [handleProgressHover]
+  );
+
   const toggleQualityMenu = useCallback(
     () => setShowQualityMenu(!showQualityMenu),
     [showQualityMenu]
@@ -280,11 +361,16 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
               <div
                 ref={progressRef}
-                className="h-1 bg-gray-600 mb-4 cursor-pointer"
+                className={`relative bg-gray-600 mb-4 cursor-pointer transition-all duration-300 ease-in-out ${
+                  isProgressHovered ? "h-3" : "h-2"
+                }`}
                 onClick={handleProgressChange}
+                onMouseEnter={handleProgressMouseEnter}
+                onMouseLeave={handleProgressMouseLeave}
               >
+                {renderBufferedRanges()}
                 <div
-                  className="h-full bg-red-600"
+                  className="absolute top-0 left-0 h-full bg-red-600"
                   style={{ width: `${(currentTime / duration) * 100}%` }}
                 />
               </div>
