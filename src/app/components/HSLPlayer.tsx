@@ -13,6 +13,7 @@ import {
   Maximize,
   Rewind,
   FastForward,
+  Minimize,
 } from "lucide-react";
 
 interface HLSPlayerProps {
@@ -30,7 +31,10 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
   const [showControls, setShowControls] = useState(false);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(1);
+  const [volume, setVolume] = useState(() => {
+    const savedVolume = localStorage.getItem(`${videoName}_volume`);
+    return savedVolume ? parseFloat(savedVolume) : 1;
+  });
   const [isMuted, setIsMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -40,6 +44,8 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
   const [currentResolution, setCurrentResolution] = useState<string>("Auto");
   const [buffered, setBuffered] = useState<TimeRanges | null>(null);
   const [isProgressHovered, setIsProgressHovered] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPlayerReady, setIsPlayerReady] = useState(false);
 
   const customLoaderRef = useRef<CustomLoaderInterface | null>(null);
 
@@ -97,6 +103,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
         }
         setCurrentLevel(hls.currentLevel);
         updateCurrentResolution(hls.currentLevel);
+        setIsPlayerReady(true);
       });
 
       hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
@@ -111,6 +118,14 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
     }
   }, [videoName]);
 
+  useEffect(() => {
+    if (isPlayerReady && videoRef.current) {
+      videoRef.current.volume = volume;
+      videoRef.current.muted = isMuted;
+      localStorage.setItem(`${videoName}_volume`, volume.toString());
+    }
+  }, [isPlayerReady, volume, isMuted, videoName]);
+
   const getSavedResolution = useCallback((videoName: string): number | null => {
     const savedResolution = localStorage.getItem(`${videoName}_resolution`);
     return savedResolution ? parseInt(savedResolution, 10) : null;
@@ -118,6 +133,21 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
 
   const saveResolution = useCallback((videoName: string, level: number) => {
     localStorage.setItem(`${videoName}_resolution`, level.toString());
+  }, []);
+
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+
+    const handleEnded = () => {
+      setIsPlaying(false);
+    };
+
+    videoElement.addEventListener("ended", handleEnded);
+
+    return () => {
+      videoElement.removeEventListener("ended", handleEnded);
+    };
   }, []);
 
   useEffect(() => {
@@ -257,9 +287,6 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const newVolume = parseFloat(e.target.value);
       setVolume(newVolume);
-      if (videoRef.current) {
-        videoRef.current.volume = newVolume;
-      }
       setIsMuted(newVolume === 0);
     },
     []
@@ -267,15 +294,18 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
 
   const toggleMute = useCallback(() => {
     if (videoRef.current) {
-      videoRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
-      if (isMuted) {
-        setVolume(videoRef.current.volume);
-      } else {
+      const newMutedState = !isMuted;
+      setIsMuted(newMutedState);
+      if (newMutedState) {
         setVolume(0);
+      } else {
+        const previousVolume = parseFloat(
+          localStorage.getItem(`${videoName}_volume`) || "1"
+        );
+        setVolume(previousVolume > 0 ? previousVolume : 0.5);
       }
     }
-  }, [isMuted]);
+  }, [isMuted, videoName]);
 
   const handleProgressChange = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
@@ -298,10 +328,16 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       playerRef.current?.requestFullscreen();
+      setIsFullscreen(true);
     } else {
       document.exitFullscreen();
+      setIsFullscreen(false);
     }
   }, []);
+
+  const handleDoubleClick = useCallback(() => {
+    toggleFullscreen();
+  }, [toggleFullscreen]);
 
   const skipBackward = useCallback(() => {
     if (videoRef.current) {
@@ -356,13 +392,14 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
             ref={videoRef}
             className="w-full h-auto"
             onClick={togglePlay}
+            onDoubleClick={handleDoubleClick}
           />
           {showControls && (
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
               <div
                 ref={progressRef}
                 className={`relative bg-gray-600 mb-4 cursor-pointer transition-all duration-300 ease-in-out ${
-                  isProgressHovered ? "h-3" : "h-2"
+                  isProgressHovered ? "h-2" : "h-1"
                 }`}
                 onClick={handleProgressChange}
                 onMouseEnter={handleProgressMouseEnter}
@@ -435,7 +472,11 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
                     )}
                   </div>
                   <button onClick={toggleFullscreen} className="text-white">
-                    <Maximize size={24} />
+                    {isFullscreen ? (
+                      <Minimize size={24} />
+                    ) : (
+                      <Maximize size={24} />
+                    )}
                   </button>
                 </div>
               </div>
