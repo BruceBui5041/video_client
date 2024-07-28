@@ -99,6 +99,7 @@ export default function EnhancedVideoUpload() {
       try {
         const response = await fetch(UPLOAD_VIDEO_API, {
           method: "POST",
+          credentials: "include",
           body: formData,
         });
 
