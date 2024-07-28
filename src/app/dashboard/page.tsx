@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { generateSlugs } from "../../utils";
 import { UPLOAD_VIDEO_API } from "@/constants";
@@ -16,7 +15,6 @@ export default function EnhancedVideoUpload() {
   const [thumbnail, setThumbnail] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     setVideoId(uuidv4());
@@ -110,7 +108,6 @@ export default function EnhancedVideoUpload() {
 
         const result = await response.text();
         alert(result);
-        router.push(`/video?id=${encodeURIComponent(videoId)}`);
       } catch (error) {
         setError(
           error instanceof Error
@@ -121,7 +118,7 @@ export default function EnhancedVideoUpload() {
         setUploading(false);
       }
     },
-    [file, title, selectedSlug, videoId, description, router]
+    [file, title, selectedSlug, videoId, description]
   );
 
   return (
