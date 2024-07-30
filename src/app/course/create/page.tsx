@@ -1,9 +1,9 @@
 "use client";
 
-import { createCourse } from "@/clientapi/course-create";
-import { getCategories } from "@/clientapi/course-get";
-import { generateSlugs } from "@/utils";
 import React, { useState, useEffect } from "react";
+import { generateSlugs } from "../../../utils";
+import { createCourse } from "@/clientapi/course-create";
+import { getCategories } from "@/clientapi/category-get";
 
 interface Category {
   id: number;
@@ -13,21 +13,25 @@ interface Category {
 const CreateCourseForm: React.FC = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [categoryId, setCategoryId] = useState<number | "">("");
+  const [categoryId, setCategoryId] = useState<string>("");
   const [slugOptions, setSlugOptions] = useState<string[]>([]);
   const [selectedSlug, setSelectedSlug] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCategories = async () => {
-      const result = await getCategories();
-      if (result.success) {
-        setCategories(result.categories || []);
+      setIsLoading(true);
+      const { success, categories } = await getCategories();
+      setIsLoading(false);
+      if (success && Array.isArray(categories)) {
+        setCategories(categories);
       } else {
-        setError(result.message || "Failed to load categories");
+        setError("Failed to load categories");
+        setCategories([]); // Ensure categories is always an array
       }
     };
 
@@ -48,7 +52,7 @@ const CreateCourseForm: React.FC = () => {
     setError(null);
     setSuccess(null);
 
-    if (typeof categoryId !== "number") {
+    if (!categoryId) {
       setError("Please select a category");
       setIsSubmitting(false);
       return;
@@ -74,6 +78,10 @@ const CreateCourseForm: React.FC = () => {
       setError(result.message || "Failed to create course");
     }
   };
+
+  if (isLoading) {
+    return <div>Loading categories...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -138,7 +146,7 @@ const CreateCourseForm: React.FC = () => {
                   name="category"
                   required
                   value={categoryId}
-                  onChange={(e) => setCategoryId(Number(e.target.value))}
+                  onChange={(e) => setCategoryId(e.target.value)}
                   className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 >
                   <option value="">Select a category</option>

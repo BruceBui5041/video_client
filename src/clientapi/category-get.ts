@@ -28,8 +28,8 @@ export const getCategories = async (): Promise<{
     });
 
     if (response.ok) {
-      const categories: Category[] = await response.json();
-      return { success: true, categories };
+      const { data } = await response.json();
+      return { success: true, categories: data };
     } else {
       const errorData = await response.json();
       return {

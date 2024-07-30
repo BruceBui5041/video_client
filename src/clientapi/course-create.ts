@@ -3,12 +3,12 @@ import { COURSES_API } from "@/constants";
 interface CreateCourseData {
   title: string;
   description: string;
-  category_id: number;
+  category_id: string;
   slug: string;
 }
 
 interface Course {
-  id: number;
+  id: string;
   title: string;
   description: string;
   categoryId: number;
