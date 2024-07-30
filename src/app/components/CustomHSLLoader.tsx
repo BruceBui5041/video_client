@@ -100,7 +100,7 @@ class CustomLoader implements CustomLoaderInterface {
     );
     apiUrl.searchParams.append("number", segmentInfo.number);
 
-    fetch(apiUrl.toString())
+    fetch(apiUrl.toString(), { credentials: "include" })
       .then((response) => {
         if (!response.ok) {
           throw new Error("Segment not available");
@@ -136,6 +136,7 @@ class CustomLoader implements CustomLoaderInterface {
     const xhr = new XMLHttpRequest();
     xhr.open("GET", url, true);
     xhr.responseType = "arraybuffer";
+    xhr.withCredentials = true;
     xhr.onload = () => {
       this.stats.loaded = xhr.response.byteLength;
       this.stats.loading.end = self.performance.now();

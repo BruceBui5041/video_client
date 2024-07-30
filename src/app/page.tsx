@@ -22,6 +22,7 @@ export default function VideoPage() {
       } else {
         setAuthError(authResult.message || "Authentication failed");
         setIsLoading(false);
+        router.push("/login");
       }
     };
 
