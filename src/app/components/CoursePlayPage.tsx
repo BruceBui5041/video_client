@@ -73,7 +73,7 @@ export default function CoursePage() {
         <div className="w-[70%] pr-4">
           <h2 className="text-xl font-bold mb-2">Video Player</h2>
           {selectedVideo ? (
-            <HLSPlayer videoName={selectedVideo.slug} />
+            <HLSPlayer videoSlug={selectedVideo.slug} courseSlug={courseSlug} />
           ) : (
             <p>Select a video to play</p>
           )}

@@ -17,10 +17,11 @@ import {
 } from "lucide-react";
 
 interface HLSPlayerProps {
-  videoName: string;
+  videoSlug: string;
+  courseSlug: string;
 }
 
-const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
+const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -32,7 +33,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(() => {
-    const savedVolume = localStorage.getItem(`${videoName}_volume`);
+    const savedVolume = localStorage.getItem(`_volume`);
     return savedVolume ? parseFloat(savedVolume) : 1;
   });
   const [isMuted, setIsMuted] = useState(false);
@@ -70,7 +71,8 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
       };
 
       const customLoader = CustomLoader.createLoader(
-        videoName,
+        videoSlug,
+        courseSlug,
         videoRef.current
       );
       const customLoaderInstance = new customLoader(
@@ -94,7 +96,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
 
       hls.attachMedia(videoRef.current);
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        const masterPlaylistUrl = `${SEGMENT_API}/playlist/${videoName}`;
+        const masterPlaylistUrl = `${SEGMENT_API}/playlist/${courseSlug}/${videoSlug}`;
         hls.loadSource(masterPlaylistUrl);
       });
 
@@ -105,7 +107,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
         );
         customLoaderInstance.setAvailableResolutions(availableResolutions);
 
-        const savedLevel = getSavedResolution(videoName);
+        const savedLevel = getSavedResolution(videoSlug);
         if (savedLevel !== null && savedLevel < hls.levels.length) {
           hls.currentLevel = savedLevel;
         }
@@ -117,14 +119,14 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
       hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
         setCurrentLevel(data.level);
         updateCurrentResolution(data.level);
-        saveResolution(videoName, data.level);
+        saveResolution(videoSlug, data.level);
       });
 
       return () => {
         hls.destroy();
       };
     }
-  }, [videoName]);
+  }, [videoSlug]);
 
   const updateSeekPosition = useCallback((clientX: number) => {
     if (progressRef.current) {
@@ -193,17 +195,17 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
     if (isPlayerReady && videoRef.current) {
       videoRef.current.volume = volume;
       videoRef.current.muted = isMuted;
-      localStorage.setItem(`${videoName}_volume`, volume.toString());
+      localStorage.setItem(`_volume`, volume.toString());
     }
-  }, [isPlayerReady, volume, isMuted, videoName]);
+  }, [isPlayerReady, volume, isMuted, videoSlug]);
 
   const getSavedResolution = useCallback((videoName: string): number | null => {
-    const savedResolution = localStorage.getItem(`${videoName}_resolution`);
+    const savedResolution = localStorage.getItem(`_resolution`);
     return savedResolution ? parseInt(savedResolution, 10) : null;
   }, []);
 
   const saveResolution = useCallback((videoName: string, level: number) => {
-    localStorage.setItem(`${videoName}_resolution`, level.toString());
+    localStorage.setItem(`_resolution`, level.toString());
   }, []);
 
   useEffect(() => {
@@ -371,12 +373,12 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoName }) => {
         setVolume(0);
       } else {
         const previousVolume = parseFloat(
-          localStorage.getItem(`${videoName}_volume`) || "1"
+          localStorage.getItem(`_volume`) || "1"
         );
         setVolume(previousVolume > 0 ? previousVolume : 0.5);
       }
     }
-  }, [isMuted, videoName]);
+  }, [isMuted, videoSlug]);
 
   const handleProgressChange = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {

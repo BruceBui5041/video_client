@@ -15,7 +15,8 @@ export interface CustomLoaderInterface extends Loader<FragmentLoaderContext> {
 }
 
 class CustomLoader implements CustomLoaderInterface {
-  private videoName: string;
+  private videoSlug: string;
+  private courseSlug: string;
   private isLastSegment: boolean = false;
   private videoElement: HTMLVideoElement | null = null;
   public context!: FragmentLoaderContext;
@@ -26,10 +27,12 @@ class CustomLoader implements CustomLoaderInterface {
 
   constructor(
     config: LoaderConfiguration,
-    videoName: string,
+    videoSlug: string,
+    courseSlug: string,
     videoElement: HTMLVideoElement
   ) {
-    this.videoName = videoName;
+    this.videoSlug = videoSlug;
+    this.courseSlug = courseSlug;
     this.videoElement = videoElement;
     this.config = config;
     this.stats = {
@@ -93,7 +96,8 @@ class CustomLoader implements CustomLoaderInterface {
     }
 
     const apiUrl = new URL(videoSourceAPI);
-    apiUrl.searchParams.append("name", this.videoName);
+    apiUrl.searchParams.append("video_slug", this.videoSlug);
+    apiUrl.searchParams.append("course_slug", this.courseSlug);
     apiUrl.searchParams.append(
       "resolution",
       this.currentResolution || segmentInfo.resolution
@@ -180,12 +184,13 @@ class CustomLoader implements CustomLoaderInterface {
   }
 
   static createLoader(
-    videoName: string,
+    videoSlug: string,
+    courseSlug: string,
     videoElement: HTMLVideoElement
   ): new (config: LoaderConfiguration) => CustomLoaderInterface {
     return class extends CustomLoader {
       constructor(config: LoaderConfiguration) {
-        super(config, videoName, videoElement);
+        super(config, videoSlug, courseSlug, videoElement);
       }
     };
   }
