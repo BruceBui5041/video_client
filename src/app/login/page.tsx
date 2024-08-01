@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, FormEvent } from "react";
+import React, { useState, useCallback, FormEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import SimpleAlert from "@/app/components/SimpleAlert";
 import { config } from "@fortawesome/fontawesome-svg-core";
@@ -8,6 +8,7 @@ import "@fortawesome/fontawesome-svg-core/styles.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEnvelope, faLock } from "@fortawesome/free-solid-svg-icons";
 import { loginUser } from "@/clientapi/login";
+import { checkAuth } from "@/clientapi/checkauth";
 
 config.autoAddCss = false;
 
@@ -17,6 +18,20 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const router = useRouter();
 
+  useEffect(() => {
+    const authenticate = async () => {
+      const authResult = await checkAuth();
+
+      if (authResult.success) {
+        router.push("/course");
+      } else {
+        router.push("/login");
+      }
+    };
+
+    authenticate();
+  }, [router]);
+
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
@@ -25,7 +40,7 @@ export default function LoginPage() {
       const result = await loginUser({ email, password });
 
       if (result.success) {
-        router.push("/dashboard"); // Redirect to dashboard or home page after successful login
+        router.push("/course"); // Redirect to dashboard or home page after successful login
       } else {
         setError(result.message || "Login failed");
       }

@@ -44,14 +44,8 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
   >(null);
   const [currentResolution, setCurrentResolution] = useState<string>("Auto");
   const [buffered, setBuffered] = useState<TimeRanges | null>(null);
-  const [isProgressHovered, setIsProgressHovered] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
-
-  const [isDragging, setIsDragging] = useState(false);
-  const [seekPosition, setSeekPosition] = useState(0);
-  const lastPlayingStateRef = useRef(false);
-  const progressBarWidthRef = useRef(0);
 
   const customLoaderRef = useRef<CustomLoaderInterface | null>(null);
 
@@ -83,12 +77,12 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
       const hls = new Hls({
         debug: true,
         fLoader: customLoader as any,
-        maxBufferSize: 5 * 1000 * 1000, // 5 MB
-        maxBufferLength: 15, // 2 seconds
+        maxBufferSize: 5 * 1000 * 1000,
+        maxBufferLength: 15,
         startLevel: -1,
-        maxMaxBufferLength: 5, // Maximum buffer size in seconds
+        maxMaxBufferLength: 5,
         xhrSetup: (xhr, url) => {
-          xhr.withCredentials = true; // Add this line to enable credentials for all XHR requests
+          xhr.withCredentials = true;
         },
       });
 
@@ -126,70 +120,54 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
         hls.destroy();
       };
     }
-  }, [videoSlug]);
+  }, [videoSlug, courseSlug]);
 
-  const updateSeekPosition = useCallback((clientX: number) => {
-    if (progressRef.current) {
-      const rect = progressRef.current.getBoundingClientRect();
-      progressBarWidthRef.current = rect.width;
-      const pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-      setSeekPosition(pos);
-    }
-  }, []);
-
-  const handleProgressMouseDown = useCallback(
+  const handleProgressChange = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (videoRef.current) {
-        setIsDragging(true);
-        lastPlayingStateRef.current = !videoRef.current.paused;
-        videoRef.current.pause();
-        updateSeekPosition(e.clientX);
+      if (videoRef.current && progressRef.current) {
+        const rect = progressRef.current.getBoundingClientRect();
+        const pos = (e.clientX - rect.left) / rect.width;
+        const newTime = pos * videoRef.current.duration;
+        videoRef.current.currentTime = newTime;
       }
     },
-    [updateSeekPosition]
-  );
-
-  const handleProgressMouseUp = useCallback(() => {
-    if (videoRef.current && isDragging) {
-      setIsDragging(false);
-      videoRef.current.currentTime = seekPosition * videoRef.current.duration;
-      if (lastPlayingStateRef.current) {
-        videoRef.current.play();
-      }
-    }
-  }, [isDragging, seekPosition]);
-
-  const handleGlobalMouseMove = useCallback(
-    (e: MouseEvent) => {
-      if (isDragging) {
-        const progressRect = progressRef.current?.getBoundingClientRect();
-        if (progressRect) {
-          const clampedX = Math.max(
-            progressRect.left,
-            Math.min(e.clientX, progressRect.right)
-          );
-          updateSeekPosition(clampedX);
-        }
-      }
-    },
-    [isDragging, updateSeekPosition]
+    []
   );
 
   useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      if (isDragging) {
-        handleProgressMouseUp();
-      }
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+
+    const updateBuffered = () => {
+      setBuffered(videoElement.buffered);
     };
 
-    document.addEventListener("mouseup", handleGlobalMouseUp);
-    document.addEventListener("mousemove", handleGlobalMouseMove);
+    videoElement.addEventListener("progress", updateBuffered);
 
     return () => {
-      document.removeEventListener("mouseup", handleGlobalMouseUp);
-      document.removeEventListener("mousemove", handleGlobalMouseMove);
+      videoElement.removeEventListener("progress", updateBuffered);
     };
-  }, [isDragging, handleProgressMouseUp, handleGlobalMouseMove]);
+  }, []);
+
+  const renderBufferedRanges = useCallback(() => {
+    if (!buffered || !videoRef.current || duration === 0) return null;
+
+    const ranges = [];
+    for (let i = 0; i < buffered.length; i++) {
+      const start = buffered.start(i);
+      const end = buffered.end(i);
+      const width = ((end - start) / duration) * 100;
+      const left = (start / duration) * 100;
+      ranges.push(
+        <div
+          key={i}
+          className="absolute h-full bg-gray-400 opacity-50"
+          style={{ left: `${left}%`, width: `${width}%` }}
+        />
+      );
+    }
+    return ranges;
+  }, [buffered, duration]);
 
   useEffect(() => {
     if (isPlayerReady && videoRef.current) {
@@ -197,7 +175,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
       videoRef.current.muted = isMuted;
       localStorage.setItem(`_volume`, volume.toString());
     }
-  }, [isPlayerReady, volume, isMuted, videoSlug]);
+  }, [isPlayerReady, volume, isMuted]);
 
   const getSavedResolution = useCallback((videoName: string): number | null => {
     const savedResolution = localStorage.getItem(`_resolution`);
@@ -240,41 +218,6 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
       videoElement.removeEventListener("loadedmetadata", updateTime);
     };
   }, []);
-
-  useEffect(() => {
-    const videoElement = videoRef.current;
-    if (!videoElement) return;
-
-    const updateBuffered = () => {
-      setBuffered(videoElement.buffered);
-    };
-
-    videoElement.addEventListener("progress", updateBuffered);
-
-    return () => {
-      videoElement.removeEventListener("progress", updateBuffered);
-    };
-  }, []);
-
-  const renderBufferedRanges = useCallback(() => {
-    if (!buffered || !videoRef.current) return null;
-
-    const ranges = [];
-    for (let i = 0; i < buffered.length; i++) {
-      const start = buffered.start(i);
-      const end = buffered.end(i);
-      const width = ((end - start) / videoRef.current.duration) * 100;
-      const left = (start / videoRef.current.duration) * 100;
-      ranges.push(
-        <div
-          key={i}
-          className="absolute h-full bg-gray-400 opacity-50"
-          style={{ left: `${left}%`, width: `${width}%` }}
-        />
-      );
-    }
-    return ranges;
-  }, [buffered]);
 
   const togglePlay = useCallback(() => {
     if (videoRef.current) {
@@ -330,10 +273,6 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
     };
   }, []);
 
-  const handleProgressHover = useCallback((isHovered: boolean) => {
-    setIsProgressHovered(isHovered);
-  }, []);
-
   const updateCurrentResolution = useCallback((level: number) => {
     if (level === -1) {
       setCurrentResolution("Auto");
@@ -378,19 +317,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
         setVolume(previousVolume > 0 ? previousVolume : 0.5);
       }
     }
-  }, [isMuted, videoSlug]);
-
-  const handleProgressChange = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (videoRef.current && progressRef.current) {
-        const rect = progressRef.current.getBoundingClientRect();
-        const pos = (e.clientX - rect.left) / rect.width;
-        const newTime = pos * videoRef.current.duration;
-        videoRef.current.currentTime = newTime;
-      }
-    },
-    []
-  );
+  }, [isMuted]);
 
   const formatTime = useCallback((time: number) => {
     const minutes = Math.floor(time / 60);
@@ -436,15 +363,6 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
   const handleMouseEnter = useCallback(() => setShowControls(true), []);
   const handleMouseLeave = useCallback(() => setShowControls(false), []);
 
-  const handleProgressMouseEnter = useCallback(
-    () => handleProgressHover(true),
-    [handleProgressHover]
-  );
-  const handleProgressMouseLeave = useCallback(
-    () => handleProgressHover(false),
-    [handleProgressHover]
-  );
-
   const toggleQualityMenu = useCallback(
     () => setShowQualityMenu(!showQualityMenu),
     [showQualityMenu]
@@ -471,31 +389,13 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
               <div
                 ref={progressRef}
-                className={`relative bg-gray-600 mb-4 cursor-pointer transition-all duration-300 ease-in-out ${
-                  isProgressHovered ? "h-2" : "h-1"
-                }`}
-                onMouseEnter={handleProgressMouseEnter}
-                onMouseLeave={handleProgressMouseLeave}
-                onMouseDown={handleProgressMouseDown}
+                className="relative bg-gray-600 mb-4 cursor-pointer h-1"
+                onClick={handleProgressChange}
               >
                 {renderBufferedRanges()}
                 <div
                   className="absolute top-0 left-0 h-full bg-red-600"
-                  style={{
-                    width: `${
-                      (isDragging ? seekPosition : currentTime / duration) * 100
-                    }%`,
-                  }}
-                />
-                <div
-                  className={`absolute top-1/2 transform -translate-y-1/2 bg-white rounded-full shadow-md transition-all duration-300 ease-in-out ${
-                    isProgressHovered ? "w-4 h-4" : "w-3 h-3"
-                  }`}
-                  style={{
-                    left: `calc(${
-                      (isDragging ? seekPosition : currentTime / duration) * 100
-                    }% - ${isProgressHovered ? "8px" : "6px"})`,
-                  }}
+                  style={{ width: `${(currentTime / duration) * 100}%` }}
                 />
               </div>
               <div className="flex items-center justify-between">

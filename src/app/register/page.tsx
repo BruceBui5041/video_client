@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, FormEvent } from "react";
+import React, { useState, useCallback, FormEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import SimpleAlert from "@/app/components/SimpleAlert";
 import { config } from "@fortawesome/fontawesome-svg-core";
@@ -8,6 +8,7 @@ import "@fortawesome/fontawesome-svg-core/styles.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faUser, faEnvelope, faLock } from "@fortawesome/free-solid-svg-icons";
 import { registerUser } from "@/clientapi/register";
+import { checkAuth } from "@/clientapi/checkauth";
 
 config.autoAddCss = false;
 
@@ -18,6 +19,20 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const router = useRouter();
+
+  useEffect(() => {
+    const authenticate = async () => {
+      const authResult = await checkAuth();
+
+      if (authResult.success) {
+        router.push("/course");
+      } else {
+        router.push("/login");
+      }
+    };
+
+    authenticate();
+  }, [router]);
 
   const handleSubmit = useCallback(
     async (e: FormEvent<HTMLFormElement>) => {

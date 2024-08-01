@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { generateSlugs } from "../../../utils";
 import { createCourse } from "@/clientapi/course-create";
 import { getCategories } from "@/clientapi/category-get";
+import { withAuth } from "@/app/components/withAuth";
 
 interface Category {
   id: number;
@@ -204,4 +205,4 @@ const CreateCourseForm: React.FC = () => {
   );
 };
 
-export default CreateCourseForm;
+export default withAuth(CreateCourseForm);

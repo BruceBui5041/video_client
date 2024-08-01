@@ -15,6 +15,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  console.log("abcd RootLayout");
   return (
     <html lang="en">
       <body className={inter.className}>{children}</body>

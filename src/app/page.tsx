@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import HLSPlayer from "./components/HSLPlayer";
 import { checkAuth } from "../clientapi/checkauth";
 
 export default function VideoPage() {

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import HLSPlayer from "./HSLPlayer";
 import VideoUploadForm from "./UploadCourseVideoForm";
@@ -17,8 +17,13 @@ export default function CoursePage() {
   const courseSlug = params.slug as string;
   const videoSlug = params.videoslug as string | undefined;
 
+  const fetchedRef = useRef(false);
+
   useEffect(() => {
     const fetchVideos = async () => {
+      if (fetchedRef.current) return;
+      fetchedRef.current = true;
+
       setIsLoading(true);
       const result = await getVideos(courseSlug);
       if (result.success) {

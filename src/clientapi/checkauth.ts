@@ -22,9 +22,12 @@ export const checkAuth = async (): Promise<{
       return { success: true };
     } else {
       const errorData = await response.json();
+
       return { success: false, message: errorData.message || "Login failed" };
     }
   } catch (err) {
+    console.log("abcd", err);
+
     return { success: false, message: "An error occurred. Please try again." };
   }
 };
