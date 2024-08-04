@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import Hls, { Level, LoaderConfiguration } from "hls.js";
 import CustomLoader, { CustomLoaderInterface } from "./CustomHSLLoader";
-import { SEGMENT_API } from "@/constants";
+import { VIDEO_API } from "@/constants";
 import {
   Play,
   Pause,
@@ -90,7 +90,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
 
       hls.attachMedia(videoRef.current);
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        const masterPlaylistUrl = `${SEGMENT_API}/playlist/${courseSlug}/${videoSlug}`;
+        const masterPlaylistUrl = `${VIDEO_API}/playlist/${courseSlug}/${videoSlug}`;
         hls.loadSource(masterPlaylistUrl);
       });
 

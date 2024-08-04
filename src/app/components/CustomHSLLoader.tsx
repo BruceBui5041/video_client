@@ -1,3 +1,4 @@
+import { VIDEO_API } from "@/constants";
 import {
   LoaderConfiguration,
   LoaderCallbacks,
@@ -6,8 +7,6 @@ import {
   LoaderStats,
   LoaderResponse,
 } from "hls.js";
-
-const videoSourceAPI = "http://localhost:3000/segment";
 
 export interface CustomLoaderInterface extends Loader<FragmentLoaderContext> {
   setResolution(resolution: string): void;
@@ -95,7 +94,7 @@ class CustomLoader implements CustomLoaderInterface {
       return;
     }
 
-    const apiUrl = new URL(videoSourceAPI);
+    const apiUrl = new URL(VIDEO_API);
     apiUrl.searchParams.append("video_slug", this.videoSlug);
     apiUrl.searchParams.append("course_slug", this.courseSlug);
     apiUrl.searchParams.append(

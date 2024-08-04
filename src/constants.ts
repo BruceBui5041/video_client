@@ -1,6 +1,8 @@
 const BE_API = "http://localhost:3000";
 
-export const SEGMENT_API = `${BE_API}/segment`;
+export const VIDEO_API = `${BE_API}/video`;
+export const PREVIEW_VIDEO_API = `${BE_API}/preview`;
+
 export const UPLOAD_VIDEO_API = `${BE_API}/upload`;
 export const REGISTER_API = `${BE_API}/register`;
 export const LOGIN_API = `${BE_API}/login`;
