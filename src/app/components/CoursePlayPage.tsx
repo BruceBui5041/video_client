@@ -6,7 +6,7 @@ import { getVideos, Video } from "../../clientapi/course-get-video";
 
 export default function CoursePage() {
   const router = useRouter();
-  const params = useParams();
+  const params = useParams<{ slug: string; videoid: string }>();
   const [videoCards, setVideoCards] = useState<number[]>([]);
   const [nextCardId, setNextCardId] = useState(1);
   const [videos, setVideos] = useState<Video[]>([]);
@@ -15,7 +15,7 @@ export default function CoursePage() {
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
 
   const courseSlug = params.slug as string;
-  const videoSlug = params.videoslug as string | undefined;
+  const videoId = params.videoid as string;
 
   const fetchedRef = useRef(false);
 
@@ -33,13 +33,14 @@ export default function CoursePage() {
         setVideos(sortedVideos);
 
         if (sortedVideos.length > 0) {
-          let videoToPlay = videoSlug
-            ? sortedVideos.find((v) => v.slug === videoSlug) || sortedVideos[0]
+          let videoToPlay = videoId
+            ? sortedVideos.find((v) => v.id.toString() === videoId) ||
+              sortedVideos[0]
             : sortedVideos[0];
           setSelectedVideo(videoToPlay);
 
-          if (videoToPlay.slug !== videoSlug) {
-            router.replace(`/course/${courseSlug}/${videoToPlay.slug}`);
+          if (videoToPlay.id.toString() !== videoId) {
+            router.replace(`/course/${courseSlug}/${videoToPlay.id}`);
           }
         }
         setError(null);
@@ -50,7 +51,7 @@ export default function CoursePage() {
     };
 
     fetchVideos();
-  }, [courseSlug, videoSlug, router]);
+  }, [courseSlug, videoId, router]);
 
   const addNewVideoCard = useCallback(() => {
     setVideoCards((prev) => [...prev, nextCardId]);
@@ -64,7 +65,7 @@ export default function CoursePage() {
   const handleVideoSelect = useCallback(
     (video: Video) => {
       setSelectedVideo(video);
-      router.replace(`/course/${courseSlug}/${video.slug}`);
+      router.replace(`/course/${courseSlug}/${video.id}`);
     },
     [courseSlug, router]
   );
@@ -78,7 +79,10 @@ export default function CoursePage() {
         <div className="w-[70%] pr-4">
           <h2 className="text-xl font-bold mb-2">Video Player</h2>
           {selectedVideo ? (
-            <HLSPlayer videoSlug={selectedVideo.slug} courseSlug={courseSlug} />
+            <HLSPlayer
+              videoId={selectedVideo.id.toString()}
+              courseSlug={courseSlug}
+            />
           ) : (
             <p>Select a video to play</p>
           )}

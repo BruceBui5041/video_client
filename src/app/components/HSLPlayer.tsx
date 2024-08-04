@@ -17,11 +17,11 @@ import {
 } from "lucide-react";
 
 interface HLSPlayerProps {
-  videoSlug: string;
+  videoId: string;
   courseSlug: string;
 }
 
-const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
+const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoId, courseSlug }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -65,7 +65,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
       };
 
       const customLoader = CustomLoader.createLoader(
-        videoSlug,
+        videoId,
         courseSlug,
         videoRef.current
       );
@@ -90,7 +90,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
 
       hls.attachMedia(videoRef.current);
       hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-        const masterPlaylistUrl = `${VIDEO_API}/playlist/${courseSlug}/${videoSlug}`;
+        const masterPlaylistUrl = `${VIDEO_API}/playlist/${courseSlug}/${videoId}`;
         hls.loadSource(masterPlaylistUrl);
       });
 
@@ -101,7 +101,7 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
         );
         customLoaderInstance.setAvailableResolutions(availableResolutions);
 
-        const savedLevel = getSavedResolution(videoSlug);
+        const savedLevel = getSavedResolution(videoId);
         if (savedLevel !== null && savedLevel < hls.levels.length) {
           hls.currentLevel = savedLevel;
         }
@@ -113,14 +113,14 @@ const HLSPlayer: React.FC<HLSPlayerProps> = ({ videoSlug, courseSlug }) => {
       hls.on(Hls.Events.LEVEL_SWITCHED, (event, data) => {
         setCurrentLevel(data.level);
         updateCurrentResolution(data.level);
-        saveResolution(videoSlug, data.level);
+        saveResolution(videoId, data.level);
       });
 
       return () => {
         hls.destroy();
       };
     }
-  }, [videoSlug, courseSlug]);
+  }, [videoId, courseSlug]);
 
   const handleProgressChange = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
